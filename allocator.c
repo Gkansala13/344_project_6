@@ -11,6 +11,28 @@
 #include "allocator.h"
 struct block *head = NULL;
 
+void *myalloc(int bytes){
+  int actual_size = PADDED_SIZE(bytes);
+  
+  if (head == NULL){
+    head = sbrk(1024);
+    head->next = NULL;
+    head->size = 1024 - PADDED_SIZE(sizeof(struct block));
+    head->in_use = 0;
+  } 
+  while(head != NULL){
+    if ((!head->in_use)&&(head->size>actual_size)){
+      head->in_use=1;
+      int padded_block_size = PADDED_SIZE(sizeof(struct block));
+      return PTR_OFFSET(head, padded_block_size);
+    }
+    else if((head->in_use==1)&&(head->size<actual_size)){
+      return NULL;
+    }
+    head = head->next; 
+  }
+}
+
 void print_data(void)
 {
   struct block *b = head;
@@ -28,17 +50,6 @@ void print_data(void)
     b = b->next;
   }
   printf("\n");
-}
-
-void *myalloc(int bytes){
-  if (head == NULL){
-    head = sbrk(1024);
-    head->next = NULL;
-    head->size = 1024 - PADDED_SIZE(sizeof(struct block));
-    head->in_use = 0;
-  } 
-  while(head != NULL){
-  }
 }
 
 void main(){

@@ -2,34 +2,44 @@
 // CS344
 // My Allocator
 
-// I beleive I fixed all my previous allocator mistakes.
-// Fixed the main declarition
-// Made copy of head called *cur before walking the list in myalloc() function
-// Removed second if statment and made it return null at end of function
-// Fixed all warnings and all tests seem to work!
+// Refractored old code after class on Wed.
+// Added Coalescing feature to myfree() using approach option 1
 
 #include "allocator.h"
 struct block *head = NULL;
 
 // Split_Space(current_node, requested_size):
-void split_space(struct block *cur, int bytes){ 
-  int required_space = PADDED_SIZE(bytes) + PADDED_SIZE(sizeof(struct block)) + 16;
+void split_space(struct block *cur, int padded_size){
+  int block_padded_size = PADDED_SIZE(sizeof(struct block)); 
+  int cur_size= cur->size;
+  int remaining_free_space = cur_size - padded_size - block_padded_size;
+  int room_to_split = remaining_free_space>=16;
   // Split if it can hold the three things, space requested from user, 
   // A new struct block, and the remaining space referred to by the new struct block (padded)
-  if (cur->size >= required_space){
-    struct block *new = PTR_OFFSET(cur, PADDED_SIZE(sizeof(struct block)));                 
-    new->next = NULL;                              // Wire it into the linked list
+  if (room_to_split){
+    struct block *new = PTR_OFFSET(cur, padded_size + block_padded_size);           
+    new ->size = cur->size - padded_size - block_padded_size;
+    cur->size = padded_size;
+    new->in_use = 0;
+    new->next = cur->next;                              // Wire it into the linked list
     cur->next = new;
-    new ->size = (cur->size) - PADDED_SIZE(bytes) - PADDED_SIZE(sizeof(struct block));
-    cur->size = PADDED_SIZE(bytes);
-    !new->in_use;
   }
 }
 
-void myfree(void *cur) {                         // Free Node taking pointer from myalloc()
-  struct block *node = cur;                      // create a pointer node to be freed
-  node=node-1;                                   // compute location through pointer subtraction
-  node->in_use = 0;                              // mark node as not in use
+void myfree(void *p) {    
+  int block_padded_size = PADDED_SIZE(sizeof(struct block));
+  struct block *b = PTR_OFFSET(p, -block_padded_size);    
+  b -> in_use = 0;
+                                                         //Start of Coalescing
+  struct block *cur = head;                              //start cur at head
+  while(cur->next!=NULL){                                //while cur->next isn't NULL:
+    if((!cur->in_use)&&(!cur->next->in_use)){            //if cur is not in_use and next node not in use:
+      cur->size += cur->next->size + block_padded_size;  //add the next node's region's size to cur's (PLUS padded size)
+      cur->next=cur->next->next;                         //make cur's next pointer skip the next node
+      }else{                                             //else
+      cur = cur->next;                                   //move cur to next node
+    }
+  }
 }
 
 void *myalloc(int bytes){
@@ -41,13 +51,16 @@ void *myalloc(int bytes){
     head->size = 1024 - PADDED_SIZE(sizeof(struct block));
     head->in_use = 0;
   }
+
+  int padded_size = PADDED_SIZE(bytes);
+  int padded_block_size = PADDED_SIZE(sizeof(struct block));
   struct block *cur = head;
+
   while(cur != NULL){
-    if ((!cur->in_use)&&(cur->size>=actual_size)){
-      split_space(cur, bytes);
+    if ((!cur->in_use)&&(cur->size>=padded_size)){
+      split_space(cur, padded_size);
       cur->in_use = 1;
-      int padded_block_size = PADDED_SIZE(sizeof(struct block));
-      return PTR_OFFSET(head, padded_block_size);
+      return PTR_OFFSET(cur, padded_block_size);
     }
     cur = cur->next;
   }
@@ -74,23 +87,33 @@ void print_data(void)
 }
 
 int main(void) {
-  // void *p;
-  // p = myalloc(512);
-  // print_data();
-  // myfree(p);
-  // print_data();
-  
-  // myalloc(10); print_data();
-  // myalloc(20); print_data();
-  // myalloc(30); print_data();
-  // myalloc(40); print_data();
-  // myalloc(50); print_data();
-  
-  void *p;
-  myalloc(10);     print_data();
-  p = myalloc(20); print_data();
-  myalloc(30);     print_data();
-  myfree(p);       print_data();
-  myalloc(40);     print_data();
-  myalloc(10);     print_data();
+
+  // void *p;  
+  // p = myalloc(10); print_data();
+  // myfree(p); print_data();
+
+
+  // void *p, *q;
+  // p = myalloc(10); print_data();
+  // q = myalloc(20); print_data();
+  // myfree(p); print_data();
+  // myfree(q); print_data();
+
+
+  // void *p, *q;
+  // p = myalloc(10); print_data();
+  // q = myalloc(20); print_data();
+  // myfree(q); print_data();
+  // myfree(p); print_data();
+
+
+  void *p, *q, *r, *s;
+  p = myalloc(10); print_data();
+  q = myalloc(20); print_data();
+  r = myalloc(30); print_data();
+  s = myalloc(40); print_data();
+  myfree(q); print_data();
+  myfree(p); print_data();
+  myfree(s); print_data();
+  myfree(r); print_data();
 }
